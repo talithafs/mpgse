@@ -1,0 +1,5 @@
+rsconnect/
+.RData
+.Rhistory
+*.pdf
+*.odt
