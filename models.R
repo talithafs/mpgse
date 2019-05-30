@@ -16,20 +16,6 @@ kss.preind <- function(x,delta,beta,lambda,alpha){
   ((beta*(lambda+alpha)*(1-x))/delta)^(1/(1-alpha))
 }
 
-# No debt, no frictions
-
-k.ndnf <- function(k,x,delta,beta,lambda,alpha,pi){
-  (1-delta)*k + pi*beta*(lambda + alpha)*(1-x)*F(1,k,1,lambda,alpha)
-}
-
-kss.ndnf <- function(x,delta,beta,lambda,alpha,pi){
-  ((pi*beta*(lambda+alpha)*(1-x))/delta)^(1/(1-alpha))
-}
-
-s.ndnf <- function(k,s,x,delta,beta,lambda,alpha,pi){
-  (((1-delta)*k + pi*beta*alpha*(1-x)*F(1,k,1,lambda,alpha))*s)/k.ndnf(k,x,delta,beta,lambda,alpha,pi)
-}
-
 # No debt, with frictions
 
 k.ndwf <- function(k,s,x,delta,beta,lambda,alpha,pi){
@@ -47,6 +33,8 @@ s.ndwf <- function(k,s,x,delta,beta,lambda,alpha,pi){
 sss.ndwf <- function(x,delta,beta,lambda,alpha,pi){
   1 - (lambda/(alpha*(pi-1)))
 }
+
+# For V&V only
 
 # With debt and frictions
 
@@ -74,6 +62,21 @@ s.wdwf <- function(k,s,d,x,delta,beta,lambda,alpha,pi,tau){
 sss.wdwf <- function(x,delta,beta,lambda,alpha,pi,tau){
   1 - (lambda - ((x-tau)/(1-tau))*(1+(pi*(1-beta))/(delta*(pi*beta - 1))))/(alpha*(pi-1))
 }
+
+# No debt, no frictions
+
+k.ndnf <- function(k,x,delta,beta,lambda,alpha,pi){
+  (1-delta)*k + pi*beta*(lambda + alpha)*(1-x)*F(1,k,1,lambda,alpha)
+}
+
+kss.ndnf <- function(x,delta,beta,lambda,alpha,pi){
+  ((pi*beta*(lambda+alpha)*(1-x))/delta)^(1/(1-alpha))
+}
+
+s.ndnf <- function(k,s,x,delta,beta,lambda,alpha,pi){
+  (((1-delta)*k + pi*beta*alpha*(1-x)*F(1,k,1,lambda,alpha))*s)/k.ndnf(k,x,delta,beta,lambda,alpha,pi)
+}
+
 
 
 ##-- With Growth
@@ -103,6 +106,16 @@ s.gwdwf <- function(k,s,d,A,g,x,delta,beta,lambda,alpha,pi,tau){
   (((1-delta-g)*k + pi*beta*alpha*(1-tau)*F(1,k,1,lambda,alpha,A))*s)/k.gwdwf(k,s,d,A,g,x,delta,beta,lambda,alpha,pi,tau)
 }
 
+# No debt, no frictions
+
+k.gndnf <- function(k,s,A,g,x,delta,beta,lambda,alpha,pi){
+  (1-delta-g)*k + pi*beta*(lambda + alpha)*(1-x)*F(1,k,1,lambda,alpha,A)
+}
+
+s.gndnf <- function(k,s,A,g,x,delta,beta,lambda,alpha,pi){
+  (((1-delta-g)*k + pi*beta*alpha*(1-x)*F(1,k,1,lambda,alpha,A))*s)/k.gndnf(k,s,A,g,x,delta,beta,lambda,alpha,pi)
+}
+
 # No debt, frictions
 
 k.gndwf <- function(k,s,A,g,x,delta,beta,lambda,alpha,pi){
@@ -112,8 +125,6 @@ k.gndwf <- function(k,s,A,g,x,delta,beta,lambda,alpha,pi){
 s.gndwf <- function(k,s,A,g,x,delta,beta,lambda,alpha,pi){
   (((1-delta-g)*k + pi*beta*alpha*(1-x)*F(1,k,1,lambda,alpha,A))*s)/k.gndwf(k,s,A,g,x,delta,beta,lambda,alpha,pi)
 }
-
-
 
 ##-- Iterations
 
@@ -198,6 +209,11 @@ recur.growth <- function(Fk,Fs,Fd=NULL,iters,g,k0,s0,d0=NULL,A0,...){
   s <- s0
   d <- d0
   A <- A0
+  n <- iters
+  
+  if(iters < 100){
+    iters = 100
+  }
   
   for(i in 1:iters){
     ret.k <- c(ret.k,k)
@@ -220,7 +236,7 @@ recur.growth <- function(Fk,Fs,Fd=NULL,iters,g,k0,s0,d0=NULL,A0,...){
     
   }
   
-  return(list(k = ret.k, s = ret.s, d = ret.d))
+  return(list(k = ret.k[1:n], s = ret.s[1:n], d = ret.d[1:n], kss = ret.k[iters], sss = ret.s[iters]))
 }
 
 get.stats <- function(k,s,A0,g,x,delta,beta,lambda,alpha,pi){
@@ -230,18 +246,31 @@ get.stats <- function(k,s,A0,g,x,delta,beta,lambda,alpha,pi){
   ret.c <- NULL
   ret.pk <- NULL
   ret.uk <- NULL
+  ret.i <- NULL
+  ret.kef <- NULL
+  ret.ce <- NULL
+  ret.cs <- NULL
+  ret.cm <- NULL
+  ret.A <- NULL
+  A <- A0
   
-  for(i in 1:length(k)){
-    y <- F(1,k[[i]],1,lambda,alpha,A)
+  for(j in 1:length(k)){
+    ret.A <- c(ret.A, A)
+    y <- F(1,k[j],1,lambda,alpha,A)
+    ret.i <- c(ret.i, beta*y*(1-x))
     ret.y <- c(ret.y, y)
-    ret.w <- c(ret.w, (1-alpha-lambda)*(k[i]^alpha)*(A^(1-alpha-lambda)))
-    ret.c <- c(ret.c, y - beta*(lambda + alpha*(1 + (pi - 1)*s[[i]]))*(1-x)*y)
-    ret.pk <- c(ret.pk, alpha*(A^(1-lambda-alpha))*(k[i]^(alpha-1)))
-    ret.uk <- c(ret.uk, (k[i]^alpha)*(A^(1-lambda-alpha)))
+    ret.w <- c(ret.w, (1-alpha-lambda)*(k[j]^alpha)*(A^(1-alpha-lambda)))
+    ret.c <- c(ret.c, (1-beta)*y*(1-x))
+    ret.ce <- c(ret.ce, (1-x)*y*alpha*s[j]*(1-beta))
+    ret.cs <- c(ret.cs, (1-x)*y*lambda*(1-beta) + (1-x)*y*(1-s[j])*alpha*(1-beta))
+    ret.cm <- c(ret.cm, (1-alpha-lambda)*y*(1-beta)*(1-x))
+    ret.pk <- c(ret.pk, alpha*(A^(1-lambda-alpha))*(k[j]^(alpha-1)))
+    ret.uk <- c(ret.uk, (k[j]^alpha)*(A^(1-lambda-alpha)))
+    ret.kef <- c(ret.kef, k[j]/A)
     A <- (1+g)*A
   }
   
-  return(list(y = ret.y, w = ret.w, c = ret.c, pk = ret.pk, uk = ret.uk))
+  return(list(A = ret.A, y = ret.y, w = ret.w, c = ret.c, pk = ret.pk, uk = ret.uk, i = ret.i, ce = ret.ce, cs = ret.cs, cm = ret.cm, kef = ret.kef))
 }
 
 

@@ -23,15 +23,15 @@ get.data <- function(){
   }
   
   series[[i]] <- list()
-  series[[i]][["series"]] <- ts(read.csv("compensation.csv")[,2],start=1978, frequency=1)
+  series[[i]][["series"]] <- ts(read.csv("compensation.csv")[,2],start=1952, frequency=1)
   series[[i]][["name"]] <- "Compensation of Employees, %GDP"
   series[[i]][["description"]] <- "Shares of gross domestic income: Compensation of employees, paid: Wage and salary accruals: Disbursements: To persons, Percent, Annual, Not Seasonally Adjusted"
   
   i <- i + 1
   series[[i]] <- list()
-  series[[i]][["series"]] <- ts(read.csv("stock.csv")[,2],start=1982)
+  series[[i]][["series"]] <- ts(read.csv("stock.csv")[,2],start=1979)
   series[[i]][["name"]] <- "Capital Stock"
-  series[[i]][["description"]] <- "Millions of 2011 U.S. Dollars, Not Seasonally Adjusted"
+  series[[i]][["description"]] <- "2010 Constant U.S. Dollars, Not Seasonally Adjusted"
   
   names(series) <- c(codes,"COMP","STK")
   
@@ -51,28 +51,33 @@ calibrate <- function(except = "none"){
   s.x <- get.series("x")$series
   s.g <- get.series("g")$series
   
-  pre$alpha <- round(mean(window(s.alpha, end = 1981))/100,2)
-  pre$lambda <- 1 - round(mean(window(s.lambda, end = 1981))/100,2) - pre$alpha 
-  pre$beta <- round(mean(window(s.beta, end = 1981))/100,2)
+  pre$alpha <- round(mean(window(s.alpha, end = 1978))/100,2)
+  pre$lambda <- 1 - round(mean(window(s.lambda, end = 1978)),2) - pre$alpha
+  pre$beta <- round(mean(window(s.beta, end = 1978))/100,2)
   pre$tau <- round(mean(s.tau)/100,2)
   pre$x <- 0
-  pre$g <- round(mean(window(s.g,start=1962, end=1981))/100,2)
+  pre$g <- round(mean(window(s.g,start=1962, end=1978))/100,2)
   
   if(except != 'alpha'){
-    post$alpha <- round(mean(window(s.alpha, start = 1982))/100,2)
+    if(except != 'lambda'){
+      post$alpha <- round(mean(window(s.alpha, start = 1979))/100,2)
+    }
+    else{
+      post$alpha <-  1 - round(mean(window(s.lambda, start = 1979))/100,2)
+    }
   }
   
   if(except != 'lambda'){
     if(except != 'alpha'){
-      post$lambda <- 1 - round(mean(window(s.lambda, start = 1982))/100,2) - post$alpha
+      post$lambda <- 1 - round(mean(window(s.lambda, start = 1979)),2) - post$alpha
     }
     else {
-      post$lambda <- 1 - round(mean(window(s.lambda, start = 1982))/100,2)
+      post$lambda <- 1 - round(mean(window(s.lambda, start = 1979)),2)
     }
   } 
   
   if(except != 'beta'){
-    post$beta <- round(mean(window(s.beta, start = 1982))/100,2)
+    post$beta <- round(mean(window(s.beta, start = 1979))/100,2)
   }
   
   if(except != 'tau'){
@@ -84,7 +89,7 @@ calibrate <- function(except = "none"){
   }
   
   if(except != 'g'){
-    post$g <- round(mean(window(s.g,start=1982))/100,2)
+    post$g <- round(mean(window(s.g,start=1979))/100,2)
   }
   
   return(list(post = post, pre = pre))
@@ -92,7 +97,7 @@ calibrate <- function(except = "none"){
 
 get.series <- function(parameter){
   
-  pop <- window(data[["SP.POP.TOTL"]]$series,start = 1982)
+  pop <- window(data[["SP.POP.TOTL"]]$series,start = 1979)
   
   if(parameter == "alpha"){
     return(data[["NE.GDI.FTOT.ZS"]])
@@ -116,46 +121,27 @@ get.series <- function(parameter){
     return(obj)
   } else if(parameter == "ypc") {
     obj <- data[["NY.GDP.MKTP.KD"]]
-    obj$series <- window(obj$series, start = 1982)/pop
+    obj$series <- window(obj$series, start = 1979)/pop
     return(obj)
   } else if(parameter == "c") {
     return(data[["NE.CON.TOTL.KD"]])
+  } else if(parameter == "cpc") {
+    obj <- data[["NE.CON.TOTL.KD"]]
+    obj$series <- window(obj$series, start = 1979)/pop
+    return(obj)
+  } else if(parameter == "ipc") {
+    obj <- data[["NE.GDI.TOTL.KD"]]
+    obj$series <- obj$series / window(pop,start = 1995)
+    return(obj)
   } else {
     return("Invalid Parameter")
   }
 }
 
-adj.series <- function(series,l0){
-  fac <- series[1]/l0
+adj.series <- function(series,l0,fac = NULL){
+  if(is.null(fac)){
+    fac <- series[1]/l0
+  }
   return(list(series = round(series/fac,2), factor = round(fac,2)))
 }
 
-
-stdz.dates <- function(list.series){
-  
-  max <- 1900
-  min <- 3000
-  
-  for(series in list.series){
-    
-    s <- start(series)[1]
-    e <- end(series)[1]
-
-    if(s > max){
-      max <- s
-    }
-    
-    if(e < min){
-      min <- e
-    }
-  }
-  
-  print(min)
-  print(max)
-  
-  for(i in 1:length(list.series)){
-    list.series[[i]] <- window(list.series[[i]], start = max, end = min)
-  }
-  
-  return(list.series)
-}
